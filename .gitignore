@@ -1,0 +1,3 @@
+# Original phone photos stay on your computer; only the converted copies in images/ go to GitHub
+source_images/
+__pycache__/

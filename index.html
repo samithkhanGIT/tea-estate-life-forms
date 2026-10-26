@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tea Estate Life Forms</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/* Layout: sticky header with progress, then a record browser (left) beside a photo-and-tagging workspace (right); stacks on phones. */
+:root{
+  --bg:#f1f5f1; --surface:#ffffff; --surface2:#e8eee9; --ink:#15231b; --muted:#56665c; --line:#d3ddd5;
+  --accent:#1c6b47; --accent-ink:#ffffff; --accent-soft:#dcefe3; --focus:#0b57d0; --warn:#8a5a00; --warn-bg:#fbf0d4;
+  --photo-bg:#1b241e;
+  --f-epiphyte:#7f8fd1; --f-herbs:#5bb04f; --f-tree:#1d6b45; --f-creeper:#1d9e99; --f-climber:#d79b14; --f-grass:#a9c52f; --f-shrub:#a8754a; --f-other:#868b99;
+  --font-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --font-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1611; --surface:#17211a; --surface2:#1f2c23; --ink:#e5eee8; --muted:#9db0a3; --line:#2b3a2f;
+  --accent:#5fcf9a; --accent-ink:#0c1a12; --accent-soft:#1d3a2b; --focus:#8ab4f8; --warn:#f0c15a; --warn-bg:#3a2f12;
+  --photo-bg:#0a0f0c;
+  --f-epiphyte:#99a6e6; --f-herbs:#78c96b; --f-tree:#3f9f73; --f-creeper:#37bdb7; --f-climber:#e8b13a; --f-grass:#c2de4a; --f-shrub:#c4915f; --f-other:#9ba0ad;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1611; --surface:#17211a; --surface2:#1f2c23; --ink:#e5eee8; --muted:#9db0a3; --line:#2b3a2f;
+  --accent:#5fcf9a; --accent-ink:#0c1a12; --accent-soft:#1d3a2b; --focus:#8ab4f8; --warn:#f0c15a; --warn-bg:#3a2f12;
+  --photo-bg:#0a0f0c;
+  --f-epiphyte:#99a6e6; --f-herbs:#78c96b; --f-tree:#3f9f73; --f-creeper:#37bdb7; --f-climber:#e8b13a; --f-grass:#c2de4a; --f-shrub:#c4915f; --f-other:#9ba0ad;
+  color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.45;
+  padding-block:0 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wrap{max-width:1280px;margin:0 auto}
+
+/* header */
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;padding-block:20px 14px}
+h1{font-family:var(--font-display);font-weight:700;font-size:clamp(22px,4vw,30px);letter-spacing:-.01em;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0}
+.head-right{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:13px;color:var(--muted)}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--f-other);display:inline-block}
+.pill.live i{background:var(--f-herbs)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:600;font-size:14px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.progress{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.bar{flex:1;height:8px;background:var(--surface2);border-radius:99px;overflow:hidden;min-width:80px}
+.bar b{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.progress span{font-family:var(--font-mono);font-size:13px;color:var(--muted);white-space:nowrap}
+
+/* two-column */
+.grid{display:grid;grid-template-columns:minmax(290px,360px) minmax(0,1fr);gap:20px;align-items:start}
+.browser{background:var(--surface);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-width:0;position:sticky;top:8px;max-height:calc(100vh - 24px)}
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;border-bottom:1px solid var(--line)}
+.filters input,.filters select,.field select,.field input{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 9px;min-width:0}
+.filters .full{grid-column:1/-1}
+.count{padding:8px 12px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--line)}
+.list{overflow:auto;min-height:120px;flex:1}
+.item{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;width:100%;text-align:left;padding:8px 12px;border:0;border-bottom:1px solid var(--line);background:transparent;cursor:pointer}
+.item:hover{background:var(--surface2)}
+.item[aria-current="true"]{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.thumb{width:44px;height:44px;border-radius:6px;background:var(--surface2);object-fit:cover;display:block}
+.thumb.none{display:grid;place-items:center;font-size:10px;color:var(--muted);font-family:var(--font-mono);text-align:center;line-height:1.1}
+.item .t{font-family:var(--font-mono);font-size:12.5px}
+.item .n{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap;background:var(--surface)}
+.tag i{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--c,var(--f-other))}
+.empty{padding:24px 16px;color:var(--muted);text-align:center}
+.toggle-list{display:none;width:100%}
+
+/* workspace */
+.work{display:grid;gap:16px;min-width:0}
+.photo{background:var(--photo-bg);border-radius:12px;display:grid;place-items:center;min-height:260px;overflow:hidden;position:relative}
+.photo img{display:block;max-width:100%;max-height:min(66vh,640px);width:auto;height:auto;object-fit:contain}
+.photo .ph{color:#b8c7bd;text-align:center;padding:40px 20px}
+.photo .ph b{display:block;font-family:var(--font-display);font-size:18px;margin-bottom:4px;color:#e5eee8}
+.nav{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.nav .pos{font-family:var(--font-mono);font-size:13px;color:var(--muted)}
+.nav .btns{display:flex;gap:8px;flex-wrap:wrap}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+h2{font-family:var(--font-display);font-size:16px;margin:0 0 12px;font-weight:700}
+.field{display:grid;gap:6px;margin-bottom:12px}
+.field label{font-weight:600;font-size:14px}
+.status{font-size:13px;color:var(--muted);min-height:18px}
+.status.err{color:var(--warn)}
+.ro{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:12px}
+dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 14px;margin:0}
+dt{color:var(--muted);font-size:13px}
+dd{margin:0;overflow-wrap:anywhere}
+dd.mono{font-family:var(--font-mono);font-size:13px}
+a{color:var(--accent)}
+svg.map{width:100%;height:auto;display:block;background:var(--surface2);border-radius:8px}
+.map-cap{font-size:12.5px;color:var(--muted);margin:8px 0 0}
+
+@media (max-width:900px){
+  .grid{grid-template-columns:minmax(0,1fr)}
+  .browser{position:static;max-height:none;order:2}
+  .toggle-list{display:block;border:0;border-bottom:1px solid var(--line);border-radius:12px 12px 0 0;padding:12px;text-align:left;background:transparent;cursor:pointer;font-weight:600}
+  .browser.collapsed .filters,.browser.collapsed .count,.browser.collapsed .list{display:none}
+  .browser:not(.collapsed) .list{max-height:60vh}
+  .cols{grid-template-columns:minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){.bar b{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Tea Estate Life Forms</h1>
+      <p class="sub">Browse each survey photo with its location and note, then record which life form it shows.</p>
+    </div>
+    <div class="head-right">
+      <span class="pill" id="sync"><i></i><span>Tags are saved in this browser</span></span>
+      <button class="btn" id="import">Import tags</button>
+      <input type="file" id="importFile" accept=".csv,text/csv" hidden>
+      <button class="btn primary" id="export">Export CSV</button>
+    </div>
+  </header>
+  <div class="progress"><div class="bar"><b id="barfill"></b></div><span id="progtxt">0 of 0 tagged</span></div>
+
+  <div class="grid">
+    <aside class="browser collapsed" id="browser">
+      <button class="toggle-list" id="toggle" aria-expanded="false">Browse all records</button>
+      <div class="filters">
+        <input class="full" id="q" type="search" placeholder="Search note or file name" aria-label="Search records">
+        <select id="fArea" aria-label="Area"></select>
+        <select id="fPhoto" aria-label="Photo">
+          <option value="all">Any photo status</option><option value="yes">With photo</option><option value="no">No photo yet</option>
+        </select>
+        <select class="full" id="fTag" aria-label="Life form filter"></select>
+      </div>
+      <div class="count" id="count"></div>
+      <div class="list" id="list" role="list"></div>
+    </aside>
+
+    <main class="work" id="work">
+      <div class="photo" id="photo"></div>
+      <div class="nav">
+        <span class="pos" id="pos"></span>
+        <div class="btns">
+          <button class="btn" id="prev">← Previous</button>
+          <button class="btn" id="next">Next →</button>
+          <button class="btn primary" id="nextUntagged">Next untagged</button>
+        </div>
+      </div>
+      <div class="cols">
+        <section class="card" aria-labelledby="h-form">
+          <h2 id="h-form">Life form</h2>
+          <div class="ro" id="ro" hidden>You have view-only access, so tags can be seen but not changed.</div>
+          <div class="field">
+            <label for="form">Select the life form in this photo</label>
+            <select id="form"></select>
+          </div>
+          <div class="field" id="otherWrap" hidden>
+            <label for="other">Type the life form</label>
+            <input id="other" type="text" maxlength="80" placeholder="e.g. Fern, Moss, Bamboo" autocomplete="off">
+          </div>
+          <div class="status" id="status" aria-live="polite"></div>
+        </section>
+        <section class="card" aria-labelledby="h-det">
+          <h2 id="h-det">Record details</h2>
+          <dl id="details"></dl>
+        </section>
+      </div>
+      <section class="card" aria-labelledby="h-map">
+        <h2 id="h-map">Where it was taken</h2>
+        <div id="mapbox"></div>
+        <p class="map-cap" id="mapcap"></p>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+(async function(){
+const RECS = await fetch('data/records.json',{cache:'no-cache'}).then(r=>{ if(!r.ok) throw 0; return r.json(); }).catch(()=>null);
+if(!RECS){
+  document.querySelector('.wrap').innerHTML='<div class="card" style="margin-top:24px"><h2>Could not load data/records.json</h2><p>Run <code>python tools/prepare.py --src "your photo folder"</code> first, and open the site through a web server (GitHub Pages, or <code>python -m http.server</code>) instead of double-clicking index.html.</p></div>';
+  return;
+}
+const FORMS = [
+  {k:'Epiphyte',c:'--f-epiphyte'},{k:'Herbs',c:'--f-herbs'},{k:'Tree',c:'--f-tree'},{k:'Creeper',c:'--f-creeper'},
+  {k:'Climber',c:'--f-climber'},{k:'Grass',c:'--f-grass'},{k:'Shrub',c:'--f-shrub'},{k:'Other',c:'--f-other'}
+];
+const COLOR = Object.fromEntries(FORMS.map(f=>[f.k,f.c]));
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// area = cluster of coordinates
+RECS.forEach(r=>{ r.area = (r.lat!=null ? (r.lat<6.96?'A':'B') : (r.date==='2026-09-06'?'A':'B')); });
+const AREA_LABEL={A:'Area A · 6.93°N 80.50°E',B:'Area B · 7.00°N 80.48°E'};
+
+let tags = {};          // id -> {form, other}
+let canWrite = true, selId = RECS[0].id;
+const LS='tea-life-forms-v1';
+try{ const s=localStorage.getItem(LS); if(s) tags=JSON.parse(s)||{}; }catch(e){}
+
+const flt = {q:'',area:'all',photo:'all',tag:'all'};
+
+/* ---------- filters setup ---------- */
+$('fArea').innerHTML = '<option value="all">All areas</option><option value="A">'+AREA_LABEL.A+'</option><option value="B">'+AREA_LABEL.B+'</option>';
+$('fTag').innerHTML = '<option value="all">Any tag status</option><option value="none">Not tagged yet</option><option value="any">Tagged</option>'+
+  FORMS.map(f=>'<option value="'+f.k+'">'+f.k+'</option>').join('');
+$('form').innerHTML = '<option value="">Select life form…</option>'+FORMS.map(f=>'<option value="'+f.k+'">'+f.k+'</option>').join('');
+
+function filtered(){
+  const q=flt.q.trim().toLowerCase();
+  return RECS.filter(r=>{
+    if(flt.area!=='all' && r.area!==flt.area) return false;
+    if(flt.photo==='yes' && !r.photo) return false;
+    if(flt.photo==='no' && r.photo) return false;
+    const t=tags[r.id];
+    if(flt.tag==='none' && t) return false;
+    if(flt.tag==='any' && !t) return false;
+    if(FORMS.some(f=>f.k===flt.tag) && (!t||t.form!==flt.tag)) return false;
+    if(q && !(r.note.toLowerCase().includes(q) || r.file.toLowerCase().includes(q) || (t&&(t.other||'').toLowerCase().includes(q)))) return false;
+    return true;
+  });
+}
+const byId = id => RECS.find(r=>r.id===id);
+function label(t){ return t ? (t.form==='Other' && t.other ? 'Other: '+t.other : t.form) : ''; }
+function tagChip(t){ return t ? '<span class="tag" style="--c:var('+COLOR[t.form]+')"><i></i>'+esc(label(t))+'</span>' : ''; }
+function fmtDate(r){ const [y,m,d]=r.date.split('-'); return +d+' '+MONTHS[+m-1]+' '+y+', '+r.time; }
+
+/* ---------- list ---------- */
+function renderList(){
+  const rows=filtered();
+  $('count').textContent = rows.length+' of '+RECS.length+' records';
+  if(!rows.length){ $('list').innerHTML='<div class="empty">No records match these filters.</div>'; return; }
+  $('list').innerHTML = rows.map(r=>{
+    const th = r.photo ? '<img class="thumb" loading="lazy" alt="" src="images/thumbs/'+r.id+'.jpg">' : '<div class="thumb none">no<br>photo</div>';
+    return '<button class="item" role="listitem" data-id="'+r.id+'" aria-current="'+(r.id===selId)+'">'+th+
+      '<span style="min-width:0"><span class="t">'+esc(r.date.slice(5))+' '+esc(r.time.slice(0,5))+'</span><br><span class="n">'+esc(r.note||'No note')+'</span></span>'+
+      '<span>'+tagChip(tags[r.id])+'</span></button>';
+  }).join('');
+}
+$('list').addEventListener('click',e=>{ const b=e.target.closest('.item'); if(b) select(b.dataset.id); });
+
+/* ---------- progress ---------- */
+function renderProgress(){
+  const n=RECS.filter(r=>tags[r.id]).length;
+  $('barfill').style.width=(100*n/RECS.length)+'%';
+  $('progtxt').textContent=n+' of '+RECS.length+' tagged';
+}
+
+/* ---------- detail ---------- */
+function renderDetail(){
+  const r=byId(selId), t=tags[r.id];
+  $('photo').innerHTML = r.photo
+    ? '<img alt="Survey photo taken '+esc(fmtDate(r))+'" src="images/full/'+r.id+'.jpg">'
+    : '<div class="ph"><b>No photo for this record yet</b><span class="mono">'+esc(r.file)+'</span></div>';
+  const rows=filtered(), i=rows.findIndex(x=>x.id===r.id);
+  $('pos').textContent = i>=0 ? 'Record '+(i+1)+' of '+rows.length : 'Not in current filter';
+  $('prev').disabled = i<=0; $('next').disabled = i<0 || i>=rows.length-1;
+  $('nextUntagged').disabled = !rows.some(x=>!tags[x.id] && x.id!==r.id);
+  const sel=$('form'); sel.value = t? t.form : '';
+  sel.disabled=!canWrite; $('other').disabled=!canWrite; $('ro').hidden=canWrite;
+  const showOther = sel.value==='Other';
+  $('otherWrap').hidden=!showOther;
+  if(showOther && document.activeElement!==$('other')) $('other').value = (t&&t.other)||'';
+  const gm = (r.lat!=null) ? 'https://www.google.com/maps?q='+r.lat+','+r.lon : '';
+  $('details').innerHTML =
+    '<dt>Captured</dt><dd>'+esc(fmtDate(r))+'</dd>'+
+    '<dt>Area</dt><dd>'+esc(AREA_LABEL[r.area])+'</dd>'+
+    '<dt>Latitude</dt><dd class="mono">'+(r.lat!=null?r.lat:'not recorded')+'</dd>'+
+    '<dt>Longitude</dt><dd class="mono">'+(r.lon!=null?r.lon:'not recorded')+'</dd>'+
+    '<dt>Note</dt><dd>'+(r.note?esc(r.note):'<span style="color:var(--muted)">No note</span>')+'</dd>'+
+    '<dt>File</dt><dd class="mono">'+esc(r.file)+'</dd>'+
+    (gm?'<dt>Map</dt><dd><a href="'+gm+'" target="_blank" rel="noopener">Open in Google Maps</a></dd>':'');
+  renderMap(r);
+}
+
+/* ---------- mini map ---------- */
+function renderMap(r){
+  const pts=RECS.filter(x=>x.area===r.area && x.lat!=null);
+  if(!pts.length || r.lat==null){
+    $('mapbox').innerHTML='<div class="empty">No coordinates were recorded for this photo.</div>'; $('mapcap').textContent=''; return;
+  }
+  const W=520,H=260,P=22;
+  const lats=pts.map(p=>p.lat), lons=pts.map(p=>p.lon);
+  const minLa=Math.min(...lats),maxLa=Math.max(...lats),minLo=Math.min(...lons),maxLo=Math.max(...lons);
+  const k=Math.cos(minLa*Math.PI/180);
+  const spanX=Math.max((maxLo-minLo)*k,1e-6), spanY=Math.max(maxLa-minLa,1e-6);
+  const s=Math.min((W-2*P)/spanX,(H-2*P)/spanY);
+  const ox=(W-spanX*s)/2, oy=(H-spanY*s)/2;
+  const X=p=>ox+(p.lon-minLo)*k*s, Y=p=>H-oy-(p.lat-minLa)*s;
+  let g='';
+  pts.forEach(p=>{
+    if(p.id===r.id) return;
+    const t=tags[p.id], col=t?'var('+COLOR[t.form]+')':'var(--surface)';
+    g+='<circle data-id="'+p.id+'" cx="'+X(p).toFixed(1)+'" cy="'+Y(p).toFixed(1)+'" r="5" fill="'+col+'" stroke="var(--muted)" stroke-width="1" style="cursor:pointer"><title>'+esc(fmtDate(p)+(p.note?' · '+p.note:''))+'</title></circle>';
+  });
+  const t=tags[r.id], col=t?'var('+COLOR[t.form]+')':'var(--accent)';
+  g+='<circle cx="'+X(r).toFixed(1)+'" cy="'+Y(r).toFixed(1)+'" r="12" fill="none" stroke="var(--accent)" stroke-width="2.5"/>'+
+     '<circle cx="'+X(r).toFixed(1)+'" cy="'+Y(r).toFixed(1)+'" r="6" fill="'+col+'" stroke="var(--ink)" stroke-width="1.5"/>';
+  const metres=Math.round(Math.max(spanX*111320,spanY*110574));
+  $('mapbox').innerHTML='<svg class="map" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Positions of photos in '+AREA_LABEL[r.area]+'">'+g+'</svg>';
+  $('mapcap').textContent=AREA_LABEL[r.area]+' · '+pts.length+' points, about '+metres+' m across. Filled dots show tagged photos; click a dot to open it.';
+}
+$('mapbox').addEventListener('click',e=>{ const c=e.target.closest('circle[data-id]'); if(c) select(c.dataset.id); });
+
+/* ---------- selection / navigation ---------- */
+function select(id){
+  selId=id; $('status').textContent=''; $('status').className='status';
+  renderList(); renderDetail();
+  const cur=$('list').querySelector('[aria-current="true"]'); if(cur) cur.scrollIntoView({block:'nearest'});
+  try{ localStorage.setItem(LS+'-sel',id);}catch(e){}
+}
+function step(d){
+  const rows=filtered(), i=rows.findIndex(x=>x.id===selId), j=i+d;
+  if(i>=0 && j>=0 && j<rows.length) select(rows[j].id);
+}
+$('prev').onclick=()=>step(-1); $('next').onclick=()=>step(1);
+$('nextUntagged').onclick=()=>{
+  const rows=filtered(), i=rows.findIndex(x=>x.id===selId);
+  const order=rows.slice(i+1).concat(rows.slice(0,Math.max(i,0)));
+  const n=order.find(x=>!tags[x.id]); if(n) select(n.id);
+};
+document.addEventListener('keydown',e=>{
+  if(/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if(e.key==='ArrowLeft') step(-1); if(e.key==='ArrowRight') step(1);
+});
+$('toggle').onclick=()=>{ const b=$('browser'); const c=b.classList.toggle('collapsed'); $('toggle').setAttribute('aria-expanded',String(!c)); };
+
+/* filters */
+let qT; $('q').addEventListener('input',e=>{ clearTimeout(qT); qT=setTimeout(()=>{flt.q=e.target.value; refreshAll();},150); });
+$('fArea').onchange=e=>{flt.area=e.target.value;refreshAll();};
+$('fPhoto').onchange=e=>{flt.photo=e.target.value;refreshAll();};
+$('fTag').onchange=e=>{flt.tag=e.target.value;refreshAll();};
+function refreshAll(){ renderList(); renderProgress(); renderDetail(); }
+
+/* ---------- saving ---------- */
+function setStatus(msg,err){ $('status').textContent=msg; $('status').className='status'+(err?' err':''); }
+function persistLocal(){ try{ localStorage.setItem(LS,JSON.stringify(tags)); }catch(e){} }
+function save(id,form,other){
+  if(form) tags[id]={form,other:form==='Other'?(other||''):''}; else delete tags[id];
+  persistLocal(); renderList(); renderProgress(); renderMapIfSel(id); updateNavState();
+  setStatus('Saved in this browser.');
+}
+function renderMapIfSel(id){ if(id===selId) renderMap(byId(id)); }
+function updateNavState(){ const rows=filtered(); $('nextUntagged').disabled=!rows.some(x=>!tags[x.id]&&x.id!==selId); }
+
+$('form').onchange=e=>{
+  const v=e.target.value;
+  $('otherWrap').hidden = v!=='Other';
+  if(v==='Other'){ const cur=tags[selId]; $('other').value=(cur&&cur.other)||''; $('other').focus(); }
+  save(selId,v,v==='Other'?$('other').value.trim():'');
+};
+let oT; $('other').addEventListener('input',()=>{
+  const id=selId; clearTimeout(oT); setStatus('Typing…');
+  oT=setTimeout(()=>{ if($('form').value==='Other') save(id,'Other',$('other').value.trim()); },600);
+});
+$('other').addEventListener('blur',()=>{ clearTimeout(oT); if($('form').value==='Other'){ const t=tags[selId]; const v=$('other').value.trim(); if(!t||t.other!==v) save(selId,'Other',v);} });
+
+/* ---------- export / import ---------- */
+function csvCell(v){ v=v==null?'':String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+$('export').onclick=()=>{
+  const head=['file','date','time','latitude','longitude','note','life_form','other_life_form'];
+  const lines=[head.join(',')].concat(RECS.map(r=>{ const t=tags[r.id]||{};
+    return [r.file,r.date,r.time,r.lat,r.lon,r.note,t.form||'',t.other||''].map(csvCell).join(','); }));
+  const blob=new Blob(['﻿'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='tea-estate-life-forms.csv';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+};
+function parseCSV(text){
+  const rows=[]; let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else if(c==='"') q=true; else if(c===',') {row.push(cur);cur='';}
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(cur);cur=''; rows.push(row); row=[]; }
+    else cur+=c; }
+  if(cur||row.length){ row.push(cur); rows.push(row); } return rows;
+}
+$('import').onclick=()=>$('importFile').click();
+$('importFile').onchange=async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rows=parseCSV((await f.text()).replace(/^﻿/,'')); const h=rows.shift()||[];
+  const iF=h.indexOf('file'), iL=h.indexOf('life_form'), iO=h.indexOf('other_life_form');
+  if(iF<0||iL<0){ setStatus('That file is not an exported tags CSV.',true); e.target.value=''; return; }
+  let n=0;
+  rows.forEach(r=>{ const stem=(r[iF]||'').replace(/\.[^.]+$/,''); const form=r[iL]||'';
+    if(byId(stem) && COLOR[form]){ tags[stem]={form,other:form==='Other'&&iO>=0?(r[iO]||''):''}; n++; } });
+  persistLocal(); refreshAll(); setStatus('Imported '+n+' tags.'); e.target.value='';
+};
+
+/* ---------- boot ---------- */
+try{ const s=localStorage.getItem(LS+'-sel'); if(s && byId(s)) selId=s; }catch(e){}
+if(!byId(selId) || !byId(selId).photo) selId=(RECS.find(r=>r.photo)||RECS[0]).id;
+refreshAll();
+})();
+</script>
+</body>
+</html>
