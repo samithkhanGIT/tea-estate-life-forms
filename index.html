@@ -6,6 +6,8 @@
 <title>Tea Estate Life Forms</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600&display=swap">
 <style>
 /* Layout: sticky header with progress, then a record browser (left) beside a photo-and-tagging workspace (right); stacks on phones. */
@@ -112,6 +114,12 @@ dt{color:var(--muted);font-size:13px}
 dd{margin:0;overflow-wrap:anywhere}
 dd.mono{font-family:var(--font-mono);font-size:13px}
 a{color:var(--accent)}
+#lmap{height:clamp(300px,46vh,460px);border-radius:8px;background:var(--surface2);z-index:0}
+#lmap.leaflet-container{font-family:var(--font-body)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 8px;margin:10px 0 0}
+.legend .tag{font-size:12px}
+.legend .tag.un i{background:#fff;border:1.5px solid #333}
+.maplinks{display:flex;flex-wrap:wrap;gap:6px 16px;margin:8px 0 0;font-size:13.5px}
 svg.map{width:100%;height:auto;display:block;background:var(--surface2);border-radius:8px}
 .map-cap{font-size:12.5px;color:var(--muted);margin:8px 0 0}
 
@@ -170,7 +178,9 @@ svg.map{width:100%;height:auto;display:block;background:var(--surface2);border-r
         </div>
         <section class="card" id="cardMap" aria-labelledby="h-map">
           <h2 id="h-map">Where it was taken</h2>
-          <div id="mapbox"></div>
+          <div id="mapbox"><div id="lmap" hidden></div><div id="mapsvg"></div></div>
+          <div class="legend" id="maplegend" hidden></div>
+          <div class="maplinks" id="maplinks"></div>
           <p class="map-cap" id="mapcap"></p>
         </section>
       </div>
@@ -304,10 +314,10 @@ function renderDetail(){
 }
 
 /* ---------- mini map ---------- */
-function renderMap(r){
+function renderMapSvg(r){
   const pts=RECS.filter(x=>x.area===r.area && x.lat!=null);
   if(!pts.length || r.lat==null){
-    $('mapbox').innerHTML='<div class="empty">No coordinates were recorded for this photo.</div>'; $('mapcap').textContent=''; return;
+    $('mapsvg').innerHTML='<div class="empty">No coordinates were recorded for this photo.</div>'; $('mapcap').textContent=''; return;
   }
   const W=520,H=260,P=22;
   const lats=pts.map(p=>p.lat), lons=pts.map(p=>p.lon);
@@ -327,8 +337,70 @@ function renderMap(r){
   g+='<circle cx="'+X(r).toFixed(1)+'" cy="'+Y(r).toFixed(1)+'" r="12" fill="none" stroke="var(--accent)" stroke-width="2.5"/>'+
      '<circle cx="'+X(r).toFixed(1)+'" cy="'+Y(r).toFixed(1)+'" r="6" fill="'+col+'" stroke="var(--ink)" stroke-width="1.5"/>';
   const metres=Math.round(Math.max(spanX*111320,spanY*110574));
-  $('mapbox').innerHTML='<svg class="map" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Positions of photos in '+AREA_LABEL[r.area]+'">'+g+'</svg>';
+  $('mapsvg').innerHTML='<svg class="map" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Positions of photos in '+AREA_LABEL[r.area]+'">'+g+'</svg>';
   $('mapcap').textContent=AREA_LABEL[r.area]+' · '+pts.length+' points, about '+metres+' m across. Filled dots show tagged photos; click a dot to open it.';
+}
+
+/* ---------- real basemap (Leaflet) ---------- */
+let lmap=null, lMarkers=null, lArea=null;
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function buildBases(){
+  const sat=L.layerGroup([
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,maxNativeZoom:17,attribution:'Imagery &copy; Esri, Maxar, Earthstar Geographics'}),
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,maxNativeZoom:17,attribution:'Labels &copy; Esri'})
+  ]);
+  const streets=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'});
+  const terrain=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'&copy; OpenStreetMap contributors, SRTM | &copy; OpenTopoMap (CC-BY-SA)'});
+  return {'Satellite + labels':sat,'Streets':streets,'Terrain':terrain};
+}
+function initLeaflet(){
+  lmap=L.map('lmap',{scrollWheelZoom:false,zoomSnap:0.5});
+  const bases=buildBases();
+  let pick='Satellite + labels';
+  try{ const s=localStorage.getItem(LS+'-base'); if(s && bases[s]) pick=s; }catch(e){}
+  bases[pick].addTo(lmap);
+  L.control.layers(bases,null,{position:'topright'}).addTo(lmap);
+  L.control.scale({imperial:false}).addTo(lmap);
+  lmap.on('baselayerchange',e=>{ try{ localStorage.setItem(LS+'-base',e.name); }catch(_){ } });
+  lMarkers=L.layerGroup().addTo(lmap);
+  // click-to-zoom the mouse wheel only after the map has been clicked
+  lmap.on('focus',()=>lmap.scrollWheelZoom.enable()); lmap.on('blur',()=>lmap.scrollWheelZoom.disable());
+}
+function renderLegend(){
+  $('maplegend').hidden=false;
+  $('maplegend').innerHTML='<span class="tag un"><i></i>Not tagged</span>'+FORMS.map(f=>'<span class="tag" style="--c:var('+f.c+')"><i></i>'+f.k+'</span>').join('');
+}
+function renderMap(r){
+  const pts=RECS.filter(x=>x.area===r.area && x.lat!=null);
+  const links=$('maplinks');
+  links.innerHTML = r.lat!=null
+    ? '<a href="https://www.google.com/maps?q='+r.lat+','+r.lon+'&t=k" target="_blank" rel="noopener">Google Maps satellite</a>'+
+      '<a href="https://www.google.com/maps?q='+r.lat+','+r.lon+'" target="_blank" rel="noopener">Google Maps street</a>'
+    : '';
+  if(!window.L || !pts.length || r.lat==null){
+    $('lmap').hidden=true; $('maplegend').hidden=true; $('mapsvg').hidden=false; renderMapSvg(r); return;
+  }
+  $('mapsvg').hidden=true; $('lmap').hidden=false;
+  if(!lmap){ initLeaflet(); }
+  lmap.invalidateSize();
+  lMarkers.clearLayers();
+  pts.forEach(p=>{
+    const t=tags[p.id], sel=p.id===r.id;
+    const m=L.circleMarker([p.lat,p.lon],{radius:sel?8:6,weight:sel?2.5:1.5,color:sel?'#000':'#ffffff',
+      fillColor:t?css(COLOR[t.form]):'#ffffff',fillOpacity:t?0.95:0.8});
+    m.bindTooltip(fmtDate(p)+(p.note?' · '+p.note:'')+(t?' · '+label(t):''));
+    m.on('click',()=>select(p.id));
+    m.addTo(lMarkers);
+  });
+  L.circleMarker([r.lat,r.lon],{radius:15,weight:3,color:'#00e5ff',fill:false,interactive:false}).addTo(lMarkers);
+  if(lArea!==r.area){
+    lArea=r.area;
+    lmap.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lon])),{padding:[36,36],maxZoom:18});
+  }else if(!lmap.getBounds().pad(-0.1).contains([r.lat,r.lon])){
+    lmap.panTo([r.lat,r.lon]);
+  }
+  renderLegend();
+  $('mapcap').textContent=AREA_LABEL[r.area]+' · '+pts.length+' points. Use the layer button on the map to switch between satellite, streets and terrain. Click a dot to open that photo.';
 }
 $('mapbox').addEventListener('click',e=>{ const c=e.target.closest('circle[data-id]'); if(c) select(c.dataset.id); });
 
