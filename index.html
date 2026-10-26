@@ -37,7 +37,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body)
   padding-block:0 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.wrap{max-width:1280px;margin:0 auto}
+.wrap{max-width:1640px;margin:0 auto}
 
 /* header */
 header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;padding-block:20px 14px}
@@ -77,7 +77,21 @@ h1{font-family:var(--font-display);font-weight:700;font-size:clamp(22px,4vw,30px
 .toggle-list{display:none;width:100%}
 
 /* workspace */
-.work{display:grid;gap:16px;min-width:0}
+.work{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:20px;align-items:start;min-width:0}
+.main-col,.side-col{display:grid;gap:16px;min-width:0;align-content:start}
+.side-col{position:sticky;top:8px}
+.current{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;background:var(--surface2);border-radius:8px}
+.current .lbl{font-size:13px;color:var(--muted)}
+.btn.danger{color:var(--warn);border-color:var(--warn)}
+.btn.danger:hover{background:var(--warn-bg)}
+.hint{font-size:13px;color:var(--muted);margin:0 0 12px}
+.link{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer;font-weight:600}
+@media (max-width:1240px){
+  .work{grid-template-columns:minmax(0,1fr)}
+  .main-col,.side-col{display:contents}
+  .side-col{position:static}
+  #photo{order:1}.nav{order:2}#cardForm{order:3}#cardDet{order:4}#cardMap{order:5}
+}
 .photo{background:var(--photo-bg);border-radius:12px;display:grid;place-items:center;min-height:260px;overflow:hidden;position:relative}
 .photo img{display:block;max-width:100%;max-height:min(66vh,640px);width:auto;height:auto;object-fit:contain}
 .photo .ph{color:#b8c7bd;text-align:center;padding:40px 20px}
@@ -144,39 +158,46 @@ svg.map{width:100%;height:auto;display:block;background:var(--surface2);border-r
     </aside>
 
     <main class="work" id="work">
-      <div class="photo" id="photo"></div>
-      <div class="nav">
-        <span class="pos" id="pos"></span>
-        <div class="btns">
-          <button class="btn" id="prev">← Previous</button>
-          <button class="btn" id="next">Next →</button>
-          <button class="btn primary" id="nextUntagged">Next untagged</button>
+      <div class="main-col">
+        <div class="photo" id="photo"></div>
+        <div class="nav">
+          <span class="pos" id="pos"></span>
+          <div class="btns">
+            <button class="btn" id="prev">← Previous</button>
+            <button class="btn" id="next">Next →</button>
+            <button class="btn primary" id="nextUntagged">Next untagged</button>
+          </div>
         </div>
+        <section class="card" id="cardMap" aria-labelledby="h-map">
+          <h2 id="h-map">Where it was taken</h2>
+          <div id="mapbox"></div>
+          <p class="map-cap" id="mapcap"></p>
+        </section>
       </div>
-      <div class="cols">
-        <section class="card" aria-labelledby="h-form">
+      <div class="side-col">
+        <section class="card" id="cardForm" aria-labelledby="h-form">
           <h2 id="h-form">Life form</h2>
           <div class="ro" id="ro" hidden>You have view-only access, so tags can be seen but not changed.</div>
+          <div class="current" id="current" hidden>
+            <div><span class="lbl">Current tag</span><br><span id="curChip"></span></div>
+            <button class="btn danger" id="removeTag" type="button">Remove tag</button>
+          </div>
           <div class="field">
-            <label for="form">Select the life form in this photo</label>
+            <label for="form" id="formLabel">Select the life form in this photo</label>
             <select id="form"></select>
           </div>
           <div class="field" id="otherWrap" hidden>
             <label for="other">Type the life form</label>
             <input id="other" type="text" maxlength="80" placeholder="e.g. Fern, Moss, Bamboo" autocomplete="off">
           </div>
+          <p class="hint" id="reassignHint" hidden>To reassign, pick a different life form above or remove the tag first.</p>
           <div class="status" id="status" aria-live="polite"></div>
         </section>
-        <section class="card" aria-labelledby="h-det">
+        <section class="card" id="cardDet" aria-labelledby="h-det">
           <h2 id="h-det">Record details</h2>
           <dl id="details"></dl>
         </section>
       </div>
-      <section class="card" aria-labelledby="h-map">
-        <h2 id="h-map">Where it was taken</h2>
-        <div id="mapbox"></div>
-        <p class="map-cap" id="mapcap"></p>
-      </section>
     </main>
   </div>
 </div>
@@ -266,6 +287,7 @@ function renderDetail(){
   $('nextUntagged').disabled = !rows.some(x=>!tags[x.id] && x.id!==r.id);
   const sel=$('form'); sel.value = t? t.form : '';
   sel.disabled=!canWrite; $('other').disabled=!canWrite; $('ro').hidden=canWrite;
+  renderTagPanel();
   const showOther = sel.value==='Other';
   $('otherWrap').hidden=!showOther;
   if(showOther && document.activeElement!==$('other')) $('other').value = (t&&t.other)||'';
@@ -345,8 +367,15 @@ function setStatus(msg,err){ $('status').textContent=msg; $('status').className=
 function persistLocal(){ try{ localStorage.setItem(LS,JSON.stringify(tags)); }catch(e){} }
 function save(id,form,other){
   if(form) tags[id]={form,other:form==='Other'?(other||''):''}; else delete tags[id];
-  persistLocal(); renderList(); renderProgress(); renderMapIfSel(id); updateNavState();
+  persistLocal(); renderList(); renderProgress(); renderMapIfSel(id); updateNavState(); if(id===selId) renderTagPanel();
   setStatus('Saved in this browser.');
+}
+function renderTagPanel(){
+  const t=tags[selId];
+  $('current').hidden=!t; $('reassignHint').hidden=!t;
+  $('curChip').innerHTML=t?tagChip(t):'';
+  $('formLabel').textContent=t?'Change the life form':'Select the life form in this photo';
+  $('removeTag').disabled=!canWrite;
 }
 function renderMapIfSel(id){ if(id===selId) renderMap(byId(id)); }
 function updateNavState(){ const rows=filtered(); $('nextUntagged').disabled=!rows.some(x=>!tags[x.id]&&x.id!==selId); }
@@ -362,6 +391,17 @@ let oT; $('other').addEventListener('input',()=>{
   oT=setTimeout(()=>{ if($('form').value==='Other') save(id,'Other',$('other').value.trim()); },600);
 });
 $('other').addEventListener('blur',()=>{ clearTimeout(oT); if($('form').value==='Other'){ const t=tags[selId]; const v=$('other').value.trim(); if(!t||t.other!==v) save(selId,'Other',v);} });
+
+/* ---------- remove tag / undo ---------- */
+$('removeTag').onclick=()=>{
+  const id=selId, prev=tags[id]; if(!prev) return;
+  clearTimeout(oT);
+  save(id,'','');
+  $('other').value=''; renderDetail();
+  $('status').className='status';
+  $('status').innerHTML='Tag removed. Choose a new life form above. <button class="link" id="undo" type="button">Undo</button>';
+  $('undo').onclick=()=>{ save(id,prev.form,prev.other); if(id===selId){ renderDetail(); } };
+};
 
 /* ---------- export / import ---------- */
 function csvCell(v){ v=v==null?'':String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
